@@ -21,6 +21,7 @@ namespace DYV_Linked_Document_Management.Utilities
         public Guid LdcSetupValidated { get; } = new Guid("9D9B1D8A-A121-437D-8252-20197C4902FC");        
         public Guid LdfFileIdentifer { get; } = new Guid("92351D44-C356-4638-879D-1E49708CECB8");
         public Guid LdfFileType { get; } = new Guid("9BDD069B-031D-484F-95B1-94AD622D369C");
+        public Guid LdfCustodianId { get; } = new Guid("467AC300-9560-46F8-B82D-12DB32FA4C80");
         public Guid LdfStatus { get; } = new Guid("C0802896-2C41-4DA3-A976-F06E35E801D8");        
 
         public DYVLDHelper(IHelper helper, IAPILog logger)

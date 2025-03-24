@@ -17,6 +17,18 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                 retVal.Add(new Field(0,          // artifactID
                     "Visible",                   // name
                     "Visible",                   // columnName
+                    0,                           // fieldTypeID
+                    0,                           // codeTypeID
+                    0,                           // fieldCategoryID
+                    false,                       // isReflected
+                    false,                       // isInLayout
+                    null,                        // value
+                    new List<Guid> { helper.LdcName }  // guids
+                    ));
+
+                retVal.Add(new Field(0,          // artifactID
+                    "Visible",                   // name
+                    "Visible",                   // columnName
                     3,                           // fieldTypeID
                     0,                           // codeTypeID
                     0,                           // fieldCategoryID
@@ -91,7 +103,7 @@ namespace DYV_Linked_Document_Management.Event_Handlers
             {
                 // Get target workspace ID from the form
                 int targetWorkspaceId = 0;
-                targetWorkspaceId = Convert.ToInt32(this.ActiveArtifact.Fields[helper.LdcTargetWorkspaceId.ToString()].Value.Value);
+                targetWorkspaceId = Helper.GetActiveCaseID();
             
                 // Check if target workspace exists
                 var eddsDbContext = Helper.GetDBContext(-1);
@@ -191,6 +203,7 @@ namespace DYV_Linked_Document_Management.Event_Handlers
             }
                         
             statusHtml.Append("</div>");
+            this.ActiveArtifact.Fields[helper.LdcName.ToString()].Value.Value = "default";
             this.ActiveArtifact.Fields[helper.LdcStatus.ToString()].Value.Value = statusHtml.ToString();            
             return retVal;
         }

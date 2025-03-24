@@ -253,7 +253,7 @@ namespace DYV_Linked_Document_Management.Handlers
             return dt;
         }
 
-        public string CreateModifiedGmailMetadataCsvFile(DataTable gmailMetadata, string originalFilePath, string fileLinkedDocumentValue, ILDLogger ldLogger)
+        public string CreateModifiedGmailMetadataCsvFile(DataTable gmailMetadata, string originalFilePath, string fileLinkedDocumentValue, int custodianIdValue, ILDLogger ldLogger)
         {
             ldLogger.LogInformation("Creating modified Gmail Metadata CSV file with identifiers");
 
@@ -299,7 +299,8 @@ namespace DYV_Linked_Document_Management.Handlers
                         DateLastMessageReceived = row["DateLastMessageReceived"].ToString(),
                         ThreadedMessageCount = row["ThreadedMessageCount"].ToString(),
                         Identifier = Guid.NewGuid().ToString(),
-                        FileLinkedDocument = fileLinkedDocumentValue
+                        FileLinkedDocument = fileLinkedDocumentValue,
+                        CustodianId = custodianIdValue
                     };
 
                     records.Add(gmailRecord);

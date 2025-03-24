@@ -16,7 +16,8 @@ namespace DYV_Linked_Document_Management.Managers
     /// </summary>
     public class JobManager
     {
-        private readonly IHelper _helper;
+        //TODO:Remove
+        //private readonly IHelper _helper;
         private readonly ILDLogger _logger;
         private readonly QueueHandler _queueHandler;
         private readonly CsvHandler _csvHandler;
@@ -39,7 +40,8 @@ namespace DYV_Linked_Document_Management.Managers
         /// <param name="queueHandler">Queue handler for managing job status</param>
         public JobManager(IHelper helper, ILDLogger logger, QueueHandler queueHandler)
         {
-            _helper = helper ?? throw new ArgumentNullException(nameof(helper));
+            //TODO:Remove
+            //_helper = helper ?? throw new ArgumentNullException(nameof(helper));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _queueHandler = queueHandler ?? throw new ArgumentNullException(nameof(queueHandler));
 
@@ -212,7 +214,8 @@ namespace DYV_Linked_Document_Management.Managers
                 _queueHandler.LogImportJobStatus(importJob.ImportQueueId, "Creating modified CSV with identifiers");
 
                 string fileLinkedDocumentValue = importJob.ImportIdentifier;
-                string modifiedCsvFilePath = _csvHandler.CreateModifiedGmailMetadataCsvFile(gmailData, importJob.ImportFilePath, fileLinkedDocumentValue, _logger);
+                int custodianIdValue = importJob.CustodianId;
+                string modifiedCsvFilePath = _csvHandler.CreateModifiedGmailMetadataCsvFile(gmailData, importJob.ImportFilePath, fileLinkedDocumentValue, custodianIdValue, _logger);
 
                 // 5. Import the data into Relativity using the modified CSV file
                 _queueHandler.LogImportJobStatus(importJob.ImportQueueId, "Importing data into Relativity");

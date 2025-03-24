@@ -122,6 +122,7 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                         string sourceId = null;
                         int workspaceId = Helper.GetActiveCaseID();
                         int? importObjectTypeId = null;
+                        int custodianId = (int)this.ActiveArtifact.Fields[helper.LdfCustodianId.ToString()].Value.Value;
                         bool isSuccess = true;                        
 
                         // Step 1: Get source ID (file identifier)
@@ -205,7 +206,8 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                                 fileTypeValue,
                                 ActiveArtifact.ArtifactID,
                                 sourceId,
-                                importObjectTypeId
+                                importObjectTypeId,
+                                custodianId
                             );
                             statusHtml.Append("<span style='color: green; font-weight: bold;'>✓ File successfully submitted for import!</span><br/>");
                         }
@@ -299,7 +301,7 @@ namespace DYV_Linked_Document_Management.Event_Handlers
         }
 
         private void InsertIntoImportQueue(int workspaceId, string filePath, string fileType,
-                                           int objectArtifactId, string sourceId, int? importObjectTypeId)
+                                           int objectArtifactId, string sourceId, int? importObjectTypeId, int custodianId)
         {
             var eddsDbContext = Helper.GetDBContext(-1);
 
@@ -312,7 +314,8 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                     new SqlParameter("@ImportWorkspaceArtifactId", workspaceId),
                     new SqlParameter("@ImportFilePath", filePath), // Full path from database
                     new SqlParameter("@LDFObjectArtifactId", objectArtifactId), // This is the current record's ArtifactID (this.ActiveArtifact.ArtifactID)
-                    new SqlParameter("@FileType", fileType)
+                    new SqlParameter("@FileType", fileType),
+                    new SqlParameter("@CustodianId", custodianId)
                 };
 
                 // Add optional ImportObjectTypeId if available
@@ -335,7 +338,8 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                         [LDFObjectArtifactId],
                         [ImportObjectTypArtifactId],
                         [FileType],
-                        [SubmittedDateTime]
+                        [SubmittedDateTime],
+                        [CustodianId]
                     )
                     VALUES
                     (
@@ -344,8 +348,9 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                         @ImportFilePath,
                         @LDFObjectArtifactId,
                         @ImportObjectTypeArtifactId,
-                        @FileType,
-                        GETUTCDATE()
+                        @FileType,                        
+                        GETUTCDATE(),
+                        @custodianId
                     )";
 
                 // Execute the insert

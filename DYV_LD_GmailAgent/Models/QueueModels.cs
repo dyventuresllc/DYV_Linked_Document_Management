@@ -43,9 +43,19 @@ namespace DYV_Linked_Document_Management.Models
         public string FileType { get; set; }
 
         /// <summary>
+        /// ID of the custodian associated with this import
+        /// </summary>
+        public int CustodianId { get; set; }
+
+        /// <summary>
         /// When the job was submitted to the queue
         /// </summary>
-        public DateTime? SubmittedDateTime { get; set; }
+        public DateTime SubmittedDateTime { get; set; }
+
+        /// <summary>
+        /// ID of the agent that processed the import
+        /// </summary>
+        public int? ImportAgentId { get; set; }
 
         /// <summary>
         /// When an agent started processing this job
@@ -58,26 +68,58 @@ namespace DYV_Linked_Document_Management.Models
         public DateTime? ImportCompletedDateTime { get; set; }
 
         /// <summary>
-        /// Whether the import was successful
+        /// Import job ID for the Relativity import
         /// </summary>
-        public bool? ImportSuccessful { get; set; }
+        public Guid? Import_ImportId { get; set; }
 
         /// <summary>
-        /// Error message if the import failed
+        /// Source ID for the Relativity import
         /// </summary>
-        public string ImportErrorMessage { get; set; }
+        public Guid? Import_SourceId { get; set; }
 
         /// <summary>
-        /// ID of the agent that processed this job
+        /// ID of the agent that processed the overlay
         /// </summary>
-        public string ImportAgentId { get; set; }
+        public int? OverlayAgentId { get; set; }
+
+        /// <summary>
+        /// Import job ID for the Relativity overlay
+        /// </summary>
+        public Guid? Overlay_ImportId { get; set; }
+
+        /// <summary>
+        /// Source ID for the Relativity overlay
+        /// </summary>
+        public Guid? Overlay_SourceId { get; set; }
+
+        /// <summary>
+        /// When an agent started processing the overlay
+        /// </summary>
+        public DateTime? OverlayStartedDateTime { get; set; }
+
+        /// <summary>
+        /// When the overlay was completed
+        /// </summary>
+        public DateTime? OverlayCompletedDateTime { get; set; }
 
         /// <summary>
         /// Returns a string representation of this import queue item
         /// </summary>
         public override string ToString()
         {
-            return $"ImportQueueId: {ImportQueueId}, FileType: {FileType}, Status: {(ImportCompletedDateTime.HasValue ? (ImportSuccessful.GetValueOrDefault() ? "Completed" : "Failed") : (ImportStartedDateTime.HasValue ? "In Progress" : "Pending"))}";
+            string importStatus = "Pending";
+            if (ImportCompletedDateTime.HasValue)
+                importStatus = "Completed";
+            else if (ImportStartedDateTime.HasValue)
+                importStatus = "In Progress";
+
+            string overlayStatus = "Not Started";
+            if (OverlayCompletedDateTime.HasValue)
+                overlayStatus = "Completed";
+            else if (OverlayStartedDateTime.HasValue)
+                overlayStatus = "In Progress";
+
+            return $"ImportQueueId: {ImportQueueId}, FileType: {FileType}, Import Status: {importStatus}, Overlay Status: {overlayStatus}";
         }
     }
 

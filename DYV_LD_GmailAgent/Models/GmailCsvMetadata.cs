@@ -24,6 +24,7 @@ namespace DYV_Linked_Document_Management.Models
         public string ThreadedMessageCount { get; set; }
         public string Identifier { get; set; }
         public string FileLinkedDocument { get; set; }
+        public int CustodianId { get; set; }
     }
     public class GmailCsvDriveLink
     {

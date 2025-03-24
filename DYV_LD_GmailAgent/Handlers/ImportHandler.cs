@@ -70,6 +70,7 @@ namespace DYV_Linked_Document_Management.Handlers
             // Added fields indices
             const int identifierColumnIndex = 19;
             const int fileLinkedDocumentColumnIndex = 20;
+            const int custodianIdColumnIndex = 21;
 
             return new List<FieldMapping>
             {
@@ -94,6 +95,7 @@ namespace DYV_Linked_Document_Management.Handlers
                 new FieldMapping { Field = "ThreadedMessageCount", ContainsID = false, ColumnIndex = 18, ContainsFilePath = false },
                 new FieldMapping { Field = "Identifier", ContainsID = false, ColumnIndex = identifierColumnIndex, ContainsFilePath = false },
                 new FieldMapping { Field = "File (Linked Document)", ContainsID = false, ColumnIndex = fileLinkedDocumentColumnIndex, ContainsFilePath = false },
+                new FieldMapping { Field = "CustodianId", ContainsID = false, ColumnIndex = custodianIdColumnIndex, ContainsFilePath = false },
             };
         }
 
