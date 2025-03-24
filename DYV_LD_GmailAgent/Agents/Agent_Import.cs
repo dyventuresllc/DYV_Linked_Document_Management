@@ -37,23 +37,19 @@ namespace DYV_Linked_Document_Management.Agents
 
                 // Mark the job as in progress using the AgentID
                 _queueHandler.MarkImportJobAsInProgress(importJob.ImportQueueId, this.AgentID.ToString());
-
-                // Improved log message with more details about the job
+                
                 _ldLogger.LogInformation($"Found import job: {importJob.ImportQueueId} with identifier: {importJob.ImportIdentifier}, for workspace: {importJob.ImportWorkspaceArtifactId}, file type: {importJob.FileType}");
                 _ldLogger.LogInformation($"Marked import job: {importJob.ImportQueueId} as in progress with agent ID: {this.AgentID}");
 
                 try
-                {
-                    // Process the job using the job manager
+                {                    
                     Task.Run(async () => await _jobManager.ProcessImportJob(importJob)).Wait();
                 }
                 catch (Exception ex)
-                {
-                    // The JobManager already handles error logging and updating the job status,
-                    // but we'll log here at the agent level as well
+                {                    
                     _ldLogger.LogError(ex, $"Error processing import job {importJob.ImportQueueId} with identifier: {importJob.ImportIdentifier}");
                     _relativityLogger.LogError(ex, $"Error processing import job {importJob.ImportQueueId} with identifier: {importJob.ImportIdentifier}");
-                    _relativityLogger.LogError($"Stack Trace: {ex.StackTrace}");
+                    _relativityLogger.LogError($"Stack Trace: {ex.StackTrace}");                    
                 }
             }
             catch (Exception ex)
