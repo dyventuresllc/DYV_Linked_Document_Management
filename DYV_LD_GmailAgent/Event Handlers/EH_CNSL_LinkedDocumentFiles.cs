@@ -10,15 +10,13 @@ using System.Data.SqlClient;
 using System.Text;
 using Relativity.HostingBridge.V1.AgentStatusManager;
 using System.Threading.Tasks;
-using Relativity.Services.Interfaces.Agent;
-using System.Linq.Expressions;
 using kCura.EventHandler.CustomAttributes;
 
 namespace DYV_Linked_Document_Management.Event_Handlers
 {
-    [kCura.EventHandler.CustomAttributes.Description("Console event handler for linked document files operation")]
+    [Description("Console event handler for linked document files operation")]
     [System.Runtime.InteropServices.Guid("9CEF33B4-372A-4C37-8A38-60105E08735E")]
-    public class EH_CNSL_LinkedDocumentFiles : ConsoleEventHandler
+    public class EH_Cnsl_LinkedDocumentFiles : ConsoleEventHandler
     {
         private IAPILog logger;
 
@@ -28,50 +26,31 @@ namespace DYV_Linked_Document_Management.Event_Handlers
             {
                 FieldCollection retVal = new FieldCollection();
                 var helper = new DYVLDHelper(this.Helper, Helper.GetLoggerFactory().GetLogger());
-                retVal.Add(new Field(0,          // artifactID
-                    "Visible",                   // name
-                    "Visible",                   // columnName
-                    0,                           // fieldTypeID
-                    0,                           // codeTypeID
-                    0,                           // fieldCategoryID
-                    false,                       // isReflected
-                    false,                       // isInLayout
-                    null,                        // value
-                    new List<Guid> { helper.LdfFileIdentifer }  // guids
+
+                // Define required fields with their specific field types
+                var requiredFields = new List<(Guid Guid, int FieldTypeID)>
+                {
+                    (helper.LdfFileIdentifer, 0),   
+                    (helper.LdfStatus, 4),          
+                    (helper.LdfObjectID_GM_Metadata, 0),  
+                    (helper.LdfFilesTableId, 0)     
+                };
+
+                foreach (var field in requiredFields)
+                {
+                    retVal.Add(new Field(0,          // artifactID
+                        "Visible",                   // name
+                        "Visible",                   // columnName
+                        field.FieldTypeID,           // Use the specific field type
+                        0,                           // codeTypeID
+                        0,                           // fieldCategoryID
+                        false,                       // isReflected
+                        false,                       // isInLayout
+                        null,                        // value
+                        new List<Guid> { field.Guid }  // guids
                     ));
-                retVal.Add(new Field(0,         // artifactID
-                   "Visible",                   // name
-                   "Visible",                   // columnName
-                   4,                           // fieldTypeID
-                   0,                           // codeTypeID
-                   0,                           // fieldCategoryID
-                   false,                       // isReflected
-                   false,                       // isInLayout
-                   null,                        // value
-                   new List<Guid> { helper.LdfStatus }  // guids
-                   )); 
-                retVal.Add(new Field(0,          // artifactID
-                   "Visible",                   // name
-                   "Visible",                   // columnName
-                   0,                           // fieldTypeID
-                   0,                           // codeTypeID
-                   0,                           // fieldCategoryID
-                   false,                       // isReflected
-                   false,                       // isInLayout
-                   null,                        // value
-                   new List<Guid> { helper.LdfObjectID_GM_Metadata }  // guids
-                   ));
-                retVal.Add(new Field(0,          // artifactID
-                   "Visible",                   // name
-                   "Visible",                   // columnName
-                   0,                           // fieldTypeID
-                   0,                           // codeTypeID
-                   0,                           // fieldCategoryID
-                   false,                       // isReflected
-                   false,                       // isInLayout
-                   null,                        // value
-                   new List<Guid> { helper.LdfFilesTableId }  // guids
-                   ));
+                }
+
                 return retVal;
             }
         }
@@ -122,97 +101,28 @@ namespace DYV_Linked_Document_Management.Event_Handlers
             </style>");
 
             returnConsole.Items.Add(refreshButton);
-
             return returnConsole;
         }
 
         public override async void OnButtonClick(ConsoleButton consoleButton)
         {
             var helper = new DYVLDHelper(this.Helper, Helper.GetLoggerFactory().GetLogger());
-
-
             var statusHtml = new StringBuilder();
-            //statusHtml.Append("<div style='font-family: monospace; font-size: 11px; padding-left: 20px;'>");
-            statusHtml.Append("<div style='font-family: monospace; font-size: 11px; padding-left: 20px; white-space: nowrap;'>");
 
+            var existingStatus = this.ActiveArtifact.Fields[helper.LdfStatus.ToString()].Value.Value?.ToString() ?? "";
+            statusHtml.Insert(0, existingStatus);
+            statusHtml.Append("<div style='font-family:Consolas,monospace;font-size:0.9em;'>");
             try
             {
                 switch (consoleButton.Name)
                 {
                     case "SubmitImportJob":
-                        // Get necessary information from the artifact                        
-                        string sourceId = null;
-                        int workspaceId = Helper.GetActiveCaseID();
-                        int? importObjectTypeId = null;
-                        int custodianId = (int)this.ActiveArtifact.Fields[helper.LdfCustodianId.ToString()].Value.Value;
-                        bool isSuccess = true;                        
+                        bool isSuccess = ValidateAndPrepareImport(helper, out string sourceId, out int workspaceId,
+                            out string fileTypeValue, out string submittedFilePath,
+                            out int? importObjectTypeId, out int custodianId);
 
-                        // Step 1: Get source ID (file identifier)
-                        var fileIdField = this.ActiveArtifact.Fields[helper.LdfFileIdentifer.ToString()];
-                        if (fileIdField != null && !fileIdField.Value.IsNull)
-                        {
-                            sourceId = fileIdField.Value.Value.ToString();
-                        }
-                        else
-                        {
-                            isSuccess = false;
-                        }
+                        var timestamp = DateTime.UtcNow.ToString("MM/dd/yyyy HH:mm:ss") + " UTC";
 
-                        // Step 2: Get file type - handle as choice collection field                        
-                        var fileTypeField = this.ActiveArtifact.Fields[helper.LdfFileType.ToString()];
-                        string fileTypeValue = string.Empty;
-                        if (fileTypeField != null && !fileTypeField.Value.IsNull)
-                        {
-                            try
-                            {
-                                ChoiceFieldValue cfv = (ChoiceFieldValue)fileTypeField.Value;
-
-                                foreach (Choice c in cfv.Choices)
-                                {
-                                    fileTypeValue = c.Name;
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.LogError($"Error processing choice field: {ex.Message}");
-                            }                            
-                        }
-                        else
-                        {                            
-                            isSuccess = false;
-                        }
-
-                        // Step 3: Get the actual file path from the database
-                        string submittedFilePath = GetFilePath(helper);
-                        if (!string.IsNullOrEmpty(submittedFilePath))
-                        {
-
-                        }
-                        else
-                        {
-                            isSuccess = false;
-                        }
-
-
-                        // Step 4: Determine ImportObjectTypeId based on file type
-                        string normalizedFileType = fileTypeValue?.Replace(" ", "").ToLowerInvariant();
-                        switch (normalizedFileType)
-                        {
-                            case "g-emailmetadata(.csv)":
-
-
-                                importObjectTypeId = (int)this.ActiveArtifact.Fields[helper.LdfObjectID_GM_Metadata.ToString()].Value.Value; //GetEmailMetadataObjectTypeId(workspaceId);
-                                if (importObjectTypeId.HasValue)
-                                {
-                                }
-                                else
-                                {
-                                    isSuccess = false;
-                                }
-                                break;
-                        }
-
-                        // Step 5: Insert into import queue if all checks passed
                         if (isSuccess)
                         {
                             InsertIntoImportQueue(
@@ -225,12 +135,10 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                                 custodianId
                             );
 
-                            var timestamp = DateTime.UtcNow + " UTC";
                             statusHtml.Append($"<div style='margin:0;padding:0 0 0 10px;'><span style='color:#555;font-weight:bold;'>[{timestamp}]</span> <span style='color:green;font-weight:bold;'>File has been submitted for import <b>successfully</b>.</span></div>");
                         }
                         else
                         {
-                            var timestamp = DateTime.UtcNow + " UTC";
                             statusHtml.Append($"<div style='margin:0;padding:0 0 0 10px;'><span style='color:#555;font-weight:bold;'>[{timestamp}]</span> <span style='color:red;font-weight:bold;'>File has not been submitted. Errors occurred, please resolve and resubmit.</span></div>");
                         }
 
@@ -244,48 +152,98 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                                 statusHtml.ToString() + "</div>",
                                 helper.Logger);
                         }
+
                         await StartImportAgentAsync();
-                    break;
+                        break;
                 }
             }
             catch (Exception ex)
             {
                 helper.Logger.LogError($"Error submitting file for import: {ex.Message}");
-                statusHtml.Append($"<span style='color: red;'>✗ Error: {ex.Message}</span><br/>");
+                var timestamp = DateTime.UtcNow + " UTC";
+                statusHtml.Append($"<div style='margin:0;padding:0 0 0 10px;'><span style='color:#555;font-weight:bold;'>[{timestamp}]</span> <span style='color:red;font-weight:bold;'>File has not been submitted. Errors occurred, please resolve and resubmit.</span></div>");
                 this.ActiveArtifact.Fields[helper.LdfStatus.ToString()].Value.Value = statusHtml.ToString() + "</div>";
             }
         }
 
-        private int? GetEmailMetadataObjectTypeId(int workspaceId)
+        private bool ValidateAndPrepareImport(DYVLDHelper helper, out string sourceId, out int workspaceId,
+            out string fileTypeValue, out string submittedFilePath,
+            out int? importObjectTypeId, out int custodianId)
         {
-            try
+            sourceId = null;
+            workspaceId = Helper.GetActiveCaseID();
+            fileTypeValue = string.Empty;
+            submittedFilePath = null;
+            importObjectTypeId = null;
+            custodianId = 0;
+            bool isSuccess = true;
+
+            // Get custodian
+            custodianId = (int)this.ActiveArtifact.Fields[helper.LdfCustodianId.ToString()].Value.Value;
+
+            // Get source ID
+            var fileIdField = this.ActiveArtifact.Fields[helper.LdfFileIdentifer.ToString()];
+            if (fileIdField != null && !fileIdField.Value.IsNull)
             {
-                var workspaceDbContext = Helper.GetDBContext(workspaceId);
+                sourceId = fileIdField.Value.Value.ToString();
+            }
+            else
+            {
+                isSuccess = false;
+            }
 
-                string sql = "SELECT G_ObjectId_Metadata FROM eddsdbo.linkeddocumentconfiguration WHERE Name like 'Default'";
-                DataTable result = workspaceDbContext.ExecuteSqlStatementAsDataTable(sql);
-
-                if (result == null || result.Rows.Count == 0 || result.Rows[0]["g_objectid_metadata"] == DBNull.Value)
+            // Get file type
+            var fileTypeField = this.ActiveArtifact.Fields[helper.LdfFileType.ToString()];
+            if (fileTypeField != null && !fileTypeField.Value.IsNull)
+            {
+                try
                 {
-                    logger.LogError("No g_objectid_metadata found in configuration");
-                    return null;
+                    ChoiceFieldValue cfv = (ChoiceFieldValue)fileTypeField.Value;
+                    foreach (Choice c in cfv.Choices)
+                    {
+                        fileTypeValue = c.Name;
+                    }
                 }
-
-                return Convert.ToInt32(result.Rows[0]["g_objectid_metadata"]);
+                catch (Exception ex)
+                {
+                    logger.LogError($"Error processing choice field: {ex.Message}");
+                    isSuccess = false;
+                }
             }
-            catch (Exception ex)
+            else
             {
-                logger.LogError($"Error getting email metadata object type ID: {ex.Message}");
-                return null;
+                isSuccess = false;
             }
-        }
+
+            // Get file path
+            submittedFilePath = GetFilePath(helper);
+            if (string.IsNullOrEmpty(submittedFilePath))
+            {
+                isSuccess = false;
+            }
+
+            // Determine import object type
+            string normalizedFileType = fileTypeValue?.Replace(" ", "").ToLowerInvariant();
+            switch (normalizedFileType)
+            {
+                case "g-emailmetadata(.csv)":
+                    importObjectTypeId = (int)this.ActiveArtifact.Fields[helper.LdfObjectID_GM_Metadata.ToString()].Value.Value;
+                    if (!importObjectTypeId.HasValue)
+                    {
+                        isSuccess = false;
+                    }
+                    break;
+            }
+
+            return isSuccess;
+        }        
 
         private string GetFilePath(DYVLDHelper helper)
         {
             try
-            {                
+            {
                 var workspaceDbContext = Helper.GetDBContext(Helper.GetActiveCaseID());
-                                
+
                 string fileSql = $"SELECT Location FROM eddsdbo.File{this.ActiveArtifact.Fields[helper.LdfFilesTableId.ToString()].Value.Value} WHERE ObjectArtifactID = {this.ActiveArtifact.ArtifactID}";
                 DataTable fileResult = workspaceDbContext.ExecuteSqlStatementAsDataTable(fileSql);
                 return fileResult.Rows[0]["Location"].ToString();
@@ -301,7 +259,6 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                                            int objectArtifactId, string sourceId, int? importObjectTypeId, int custodianId)
         {
             var eddsDbContext = Helper.GetDBContext(-1);
-
             try
             {
                 // Build SQL parameters
@@ -314,7 +271,6 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                     new SqlParameter("@FileType", fileType),
                     new SqlParameter("@CustodianId", custodianId)
                 };
-
                 // Add optional ImportObjectTypeId if available
                 if (importObjectTypeId.HasValue)
                 {
@@ -324,7 +280,6 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                 {
                     parameters.Add(new SqlParameter("@ImportObjectTypeArtifactId", DBNull.Value));
                 }
-
                 // SQL for inserting into import queue
                 string sql = @"
                     INSERT INTO [QE].[LinkedDocumentImportQueue]
@@ -349,10 +304,8 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                         GETUTCDATE(),
                         @custodianId
                     )";
-
                 // Execute the insert
                 eddsDbContext.ExecuteNonQuerySQLStatement(sql, parameters.ToArray());
-
                 string fileName = System.IO.Path.GetFileName(filePath);
                 logger.LogInformation($"Successfully inserted file {fileName} into import queue for workspace {workspaceId}");
             }
@@ -370,21 +323,18 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                 //Get the agent GUID from the database
                 var eddsDbContext = Helper.GetDBContext(-1);
                 string agentGuidSql = @"SELECT AgentTypeGuid FROM eddsdbo.ExtendedAgent WHERE AgentTypeName like '%DYV Linked Document Mgmt - Import%'";
-
                 DataTable result = eddsDbContext.ExecuteSqlStatementAsDataTable(agentGuidSql);
-
                 if (result == null || result.Rows.Count == 0)
                 {
                     logger.LogError("Linked Document Import Agent not found");
                     return;
                 }
                 Guid agentGuid = new Guid(result.Rows[0]["AgentTypeGuid"].ToString());
-
                 //Start the agent using the agent Manager API
                 IServicesMgr servicesMgr = Helper.GetServicesManager();
                 using (var agentManager = servicesMgr.CreateProxy<IAgentStatusManagerService>(ExecutionIdentity.System))
                 {
-                    await agentManager.StartAgentAsync(agentGuid);                    
+                    await agentManager.StartAgentAsync(agentGuid);
                 }
             }
             catch (Exception ex)

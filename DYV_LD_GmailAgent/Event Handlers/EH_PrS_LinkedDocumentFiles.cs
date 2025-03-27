@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using System.Text;
 using DYV_Linked_Document_Management.Utilities;
 using kCura.EventHandler;
@@ -10,7 +9,7 @@ using Field = kCura.EventHandler.Field;
 
 namespace DYV_Linked_Document_Management.Event_Handlers
 {
-    public class EH_PS_LinkedDocumentFiles : PreSaveEventHandler
+    public class EH_PrS_LinkedDocumentFiles : PreSaveEventHandler
     {
         private IAPILog logger;
         public override FieldCollection RequiredFields
@@ -23,61 +22,31 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                     logger = Helper.GetLoggerFactory().GetLogger();
                 }
                 var helper = new DYVLDHelper(this.Helper, Helper.GetLoggerFactory().GetLogger());
-                retVal.Add(new Field(0,          // artifactID
-                    "Visible",                   // name
-                    "Visible",                   // columnName
-                    0,                           // fieldTypeID
-                    0,                           // codeTypeID
-                    0,                           // fieldCategoryID
-                    false,                       // isReflected
-                    false,                       // isInLayout
-                    null,                        // value
-                    new List<Guid> { helper.LdfFileIdentifer }  // guids
+
+                var requiredFields = new List<(Guid Guid, int FieldTypeID)>
+                {
+                    (helper.LdfFileIdentifer,0),
+                    (helper.LdfStatus, 4),
+                    (helper.LdfObjectId, 0),
+                    (helper.LdfObjectID_GM_Metadata, 0),
+                    (helper.LdfFilesTableId, 0)
+                };
+
+                foreach(var field in requiredFields)
+                {
+                    retVal.Add(new Field(0,          // artifactID
+                        "Visible",                   // name
+                        "Visible",                   // columnName
+                        field.FieldTypeID,           // Use the specific field type
+                        0,                           // codeTypeID
+                        0,                           // fieldCategoryID
+                        false,                       // isReflected
+                        false,                       // isInLayout
+                        null,                        // value
+                        new List<Guid> { field.Guid }  // guids
                     ));
-                retVal.Add(new Field(0,         // artifactID
-                   "Visible",                   // name
-                   "Visible",                   // columnName
-                   4,                           // fieldTypeID
-                   0,                           // codeTypeID
-                   0,                           // fieldCategoryID
-                   false,                       // isReflected
-                   false,                       // isInLayout
-                   null,                        // value
-                   new List<Guid> { helper.LdfStatus }  // guids
-                   ));
-                retVal.Add(new Field(0,         // artifactID
-                   "Visible",                   // name
-                   "Visible",                   // columnName
-                   1,                           // fieldTypeID
-                   0,                           // codeTypeID
-                   0,                           // fieldCategoryID
-                   false,                       // isReflected
-                   false,                       // isInLayout
-                   null,                        // value
-                   new List<Guid> { helper.LdfObjectId }  // guids
-                   ));
-                retVal.Add(new Field(0,         // artifactID
-                   "Visible",                   // name
-                   "Visible",                   // columnName
-                   0,                           // fieldTypeID
-                   0,                           // codeTypeID
-                   0,                           // fieldCategoryID
-                   false,                       // isReflected
-                   false,                       // isInLayout
-                   null,                        // value
-                   new List<Guid> { helper.LdfFilesTableId }  // guids
-                   ));
-                retVal.Add(new Field(0,         // artifactID
-                    "Visible",                  // name
-                    "Visible",                  // columnName
-                    0,                          // fieldTypeID
-                    0,                          // codeTypeID
-                    0,                          // fieldCategoryID
-                    false,                      // isReflected
-                    false,                      // isInLayout
-                    null,                       // value
-                    new List<Guid> { helper.LdfObjectID_GM_Metadata }  // guids
-                    ));
+                }
+
                 return retVal;
             }
         }
@@ -109,21 +78,7 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                 var dbContext = Helper.GetDBContext(Helper.GetActiveCaseID());
                 ValidateLdfObjectTypeId(statusHtml, ref retVal, dbContext, helper, DateTime.UtcNow);
                 ValidateLdfGMMetadataObjectTypeID(statusHtml, ref retVal, dbContext, helper, DateTime.UtcNow);
-                var fileFieldId = ValidateFileId(statusHtml, ref retVal, dbContext, helper, DateTime.UtcNow);
-
-                bool isNewRecord = this.ActiveArtifact.IsNew;
-                switch (isNewRecord)
-                {
-                    case true:
-
-                        ExtractFileNameFromNewRecord(statusHtml, ref retVal);              
-                        break;
-                    case false:
-                        var fileName = ExtractFileNameFromExistingRecord(statusHtml, ref retVal, dbContext, helper, DateTime.UtcNow, fileFieldId, this.ActiveArtifact.ArtifactID);
-                        this.ActiveArtifact.Fields[helper.LdfFileIdentifer.ToString()].Value.Value = fileName;
-                        break;
-                }
-                             
+                var fileFieldId = ValidateFileId(statusHtml, ref retVal, dbContext, helper, DateTime.UtcNow);                             
             }
             catch (Exception ex)
             {
@@ -276,83 +231,6 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                 retVal.Success = false;
                 retVal.Message = "Error Validating File Table ArtifactId";
                 return 0;
-            }
-        }
-        private string ExtractFileNameFromNewRecord(StringBuilder statusHtml, ref Response retVal)
-        {
-            string newfileName = null;
-            var fileField = ActiveArtifact.Fields.Cast<Field>().FirstOrDefault(field => field.FieldTypeID == 9);
-
-            if (fileField != null && !fileField.Value.IsNull)
-            {
-                var fileFieldValue = (FileFieldValue)fileField.Value;
-                if (fileFieldValue.FileValue != null)
-                {
-                    newfileName = System.IO.Path.GetFileName(fileFieldValue.FileValue.FilePath);
-                }
-            }
-
-            // If we found a filename, update fields
-            if (!string.IsNullOrEmpty(newfileName))
-            {
-                // Set the File Name field (Type 0)
-                var fileNameField = ActiveArtifact.Fields.Cast<Field>()
-                    .FirstOrDefault(field => field.Name == "File Identifier");
-
-                if (fileNameField != null)
-                {
-                    fileNameField.Value.Value = newfileName;
-                    string formattedTimestamp = DateTime.UtcNow.ToString("MM/dd/yyyy HH:mm:ss") + " UTC";
-                    statusHtml.Append($"<div style='margin:0;padding:0 0 0 10px;'><span style='color:#555;font-weight:bold;'>[{formattedTimestamp}]</span> File Identifier has been updated to reflect File GUID (name): <span style='color:#0066cc;'>{newfileName}</span></div>");
-                    return newfileName;
-                }
-                else
-                {
-                    retVal.Success = false;
-                    retVal.Message = "Unspecified Error could not save record.";
-                    return null;
-                }
-            }
-
-            return null;
-        }
-        private string ExtractFileNameFromExistingRecord(StringBuilder statusHtml, ref Response retVal, IDBContext dbContext, DYVLDHelper helper, DateTime timestamp, int fileFieldId, int objectArtifactId)
-        {
-            try
-            {
-                string fileTableName = $"File{fileFieldId}";
-                string filePathSql = $"SELECT Location FROM eddsdbo.[{fileTableName}] WHERE ObjectArtifactID = {objectArtifactId}";
-                object result = dbContext.ExecuteSqlStatementAsScalar(filePathSql);
-
-                if (result == null || result == DBNull.Value)
-                {
-                    retVal.Success = false;
-                    retVal.Message = "File location not found in database";
-                    return string.Empty;
-                }
-                string filePath = result.ToString();
-                int startIndex = filePath.IndexOf($"\\{fileTableName}\\");
-                if (startIndex >= 0)
-                {
-                    string fileName = filePath.Substring(startIndex + fileTableName.Length + 2);
-                    string formattedTimestamp = timestamp.ToString("MM/dd/yyyy HH:mm:ss") + " UTC";
-                    statusHtml.Append($"<div style='margin:0;padding:0 0 0 10px;'><span style='color:#555;font-weight:bold;'>[{formattedTimestamp}]</span> File Name extracted from filepath: <span style='color:#0066cc;'>{fileName}</span></div>");
-                    return fileName;
-                }
-                else
-                {
-                    retVal.Success = false;
-                    retVal.Message = "Error extracting filename from filepath";
-                    return string.Empty;
-                }
-            }
-            catch (Exception ex)
-            {
-                NullValues(helper);
-                helper.Logger.LogError($"Error extracting fileName from filepath - {ex.Message}");
-                retVal.Success = false;
-                retVal.Message = "Error extracting filename from filepath";
-                return string.Empty;
             }
         }        
         private void NullValues(DYVLDHelper helper)

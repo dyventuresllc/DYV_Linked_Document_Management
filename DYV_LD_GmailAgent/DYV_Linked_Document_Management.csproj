@@ -133,9 +133,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Agents\Agent_Import.cs" />
-    <Compile Include="Event Handlers\EH_CNSL_LinkedDocumentFiles.cs" />
-    <Compile Include="Event Handlers\EH_PS_LinkedDocumentFiles.cs" />
-    <Compile Include="Event Handlers\EH_PS_LinkedDocumentConfig.cs" />
+    <Compile Include="Event Handlers\EH_Cnsl_LinkedDocumentFiles.cs" />
+    <Compile Include="Event Handlers\EH_PoS_LinkedDocumentFiles.cs" />
+    <Compile Include="Event Handlers\EH_PrS_LinkedDocumentFiles.cs" />
     <Compile Include="Handlers\CsvHandler.cs" />
     <Compile Include="Handlers\ImportHandler.cs" />
     <Compile Include="Handlers\ObjectHandler.cs" />
