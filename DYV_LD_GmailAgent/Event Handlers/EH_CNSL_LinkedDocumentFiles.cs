@@ -12,6 +12,7 @@ using Relativity.HostingBridge.V1.AgentStatusManager;
 using System.Threading.Tasks;
 using Relativity.Services.Interfaces.Agent;
 using System.Linq.Expressions;
+using kCura.EventHandler.CustomAttributes;
 
 namespace DYV_Linked_Document_Management.Event_Handlers
 {
@@ -38,7 +39,7 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                     null,                        // value
                     new List<Guid> { helper.LdfFileIdentifer }  // guids
                     ));
-                retVal.Add(new Field(0,                         // artifactID
+                retVal.Add(new Field(0,         // artifactID
                    "Visible",                   // name
                    "Visible",                   // columnName
                    4,                           // fieldTypeID
@@ -48,8 +49,29 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                    false,                       // isInLayout
                    null,                        // value
                    new List<Guid> { helper.LdfStatus }  // guids
-                   )); ;
-
+                   )); 
+                retVal.Add(new Field(0,          // artifactID
+                   "Visible",                   // name
+                   "Visible",                   // columnName
+                   0,                           // fieldTypeID
+                   0,                           // codeTypeID
+                   0,                           // fieldCategoryID
+                   false,                       // isReflected
+                   false,                       // isInLayout
+                   null,                        // value
+                   new List<Guid> { helper.LdfObjectID_GM_Metadata }  // guids
+                   ));
+                retVal.Add(new Field(0,          // artifactID
+                   "Visible",                   // name
+                   "Visible",                   // columnName
+                   0,                           // fieldTypeID
+                   0,                           // codeTypeID
+                   0,                           // fieldCategoryID
+                   false,                       // isReflected
+                   false,                       // isInLayout
+                   null,                        // value
+                   new List<Guid> { helper.LdfFilesTableId }  // guids
+                   ));
                 return retVal;
             }
         }
@@ -130,11 +152,9 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                         if (fileIdField != null && !fileIdField.Value.IsNull)
                         {
                             sourceId = fileIdField.Value.Value.ToString();
-                            statusHtml.Append($"✓ File Identifier: {sourceId}<br/>");
                         }
                         else
                         {
-                            statusHtml.Append("<span style='color: red;'>✗ File Identifier field not found or empty</span><br/>");
                             isSuccess = false;
                         }
 
@@ -151,30 +171,25 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                                 {
                                     fileTypeValue = c.Name;
                                 }
-
                             }
                             catch (Exception ex)
                             {
                                 logger.LogError($"Error processing choice field: {ex.Message}");
-                            }
-
-                            statusHtml.Append($"✓ File Type: {fileTypeValue}<br/>");
+                            }                            
                         }
                         else
-                        {
-                            statusHtml.Append("<span style='color: red;'>✗ File Type field not found or empty</span><br/>");
+                        {                            
                             isSuccess = false;
                         }
 
                         // Step 3: Get the actual file path from the database
-                        string submittedFilePath = GetFilePath(workspaceId, ActiveArtifact.ArtifactID);
+                        string submittedFilePath = GetFilePath(helper);
                         if (!string.IsNullOrEmpty(submittedFilePath))
                         {
-                            statusHtml.Append($"✓ File Path is obtained<br/>");
+
                         }
                         else
                         {
-                            statusHtml.Append("<span style='color: red;'>✗ Could not retrieve file path</span><br/>");
                             isSuccess = false;
                         }
 
@@ -184,14 +199,14 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                         switch (normalizedFileType)
                         {
                             case "g-emailmetadata(.csv)":
-                                importObjectTypeId = GetEmailMetadataObjectTypeId(workspaceId);
+
+
+                                importObjectTypeId = (int)this.ActiveArtifact.Fields[helper.LdfObjectID_GM_Metadata.ToString()].Value.Value; //GetEmailMetadataObjectTypeId(workspaceId);
                                 if (importObjectTypeId.HasValue)
                                 {
-                                    statusHtml.Append($"✓ Gmail (CSV) Metadata Object ID: {importObjectTypeId}<br/>");
                                 }
                                 else
                                 {
-                                    statusHtml.Append("<span style='color: red;'>✗ Could not determine object type ID for email metadata</span><br/>");
                                     isSuccess = false;
                                 }
                                 break;
@@ -209,11 +224,14 @@ namespace DYV_Linked_Document_Management.Event_Handlers
                                 importObjectTypeId,
                                 custodianId
                             );
-                            statusHtml.Append("<span style='color: green; font-weight: bold;'>✓ File successfully submitted for import!</span><br/>");
+
+                            var timestamp = DateTime.UtcNow + " UTC";
+                            statusHtml.Append($"<div style='margin:0;padding:0 0 0 10px;'><span style='color:#555;font-weight:bold;'>[{timestamp}]</span> <span style='color:green;font-weight:bold;'>File has been submitted for import <b>successfully</b>.</span></div>");
                         }
                         else
                         {
-                            statusHtml.Append("<span style='color: red; font-weight: bold;'>✗ Import submission failed due to errors above.</span><br/>");
+                            var timestamp = DateTime.UtcNow + " UTC";
+                            statusHtml.Append($"<div style='margin:0;padding:0 0 0 10px;'><span style='color:#555;font-weight:bold;'>[{timestamp}]</span> <span style='color:red;font-weight:bold;'>File has not been submitted. Errors occurred, please resolve and resubmit.</span></div>");
                         }
 
                         IServicesMgr servicesMgr = Helper.GetServicesManager();
@@ -262,40 +280,19 @@ namespace DYV_Linked_Document_Management.Event_Handlers
             }
         }
 
-        private string GetFilePath(int workspaceId, int objectArtifactId)
+        private string GetFilePath(DYVLDHelper helper)
         {
             try
-            {
-                var eddsDbContext = Helper.GetDBContext(-1);
-                var workspaceDbContext = Helper.GetDBContext(workspaceId);
-
-                // Get the LDFFilesTableId from configuration
-                string configSql = "SELECT LDFFilesTableId FROM eddsdbo.LinkedDocumentConfiguration WHERE Name like 'Default'";
-                DataTable configResult = workspaceDbContext.ExecuteSqlStatementAsDataTable(configSql);
-
-                if (configResult == null || configResult.Rows.Count == 0)
-                {
-                    logger.LogError("No LinkedDocumentConfiguration found with Name='Default'");
-                    return null;
-                }
-
-                int fileTableId = Convert.ToInt32(configResult.Rows[0]["LDFFilesTableId"]);
-
-                // Get file location from the specific file table using the table ID
-                string fileSql = $"SELECT Location FROM eddsdbo.file{fileTableId} WHERE ObjectArtifactID = {objectArtifactId}";
+            {                
+                var workspaceDbContext = Helper.GetDBContext(Helper.GetActiveCaseID());
+                                
+                string fileSql = $"SELECT Location FROM eddsdbo.File{this.ActiveArtifact.Fields[helper.LdfFilesTableId.ToString()].Value.Value} WHERE ObjectArtifactID = {this.ActiveArtifact.ArtifactID}";
                 DataTable fileResult = workspaceDbContext.ExecuteSqlStatementAsDataTable(fileSql);
-
-                if (fileResult == null || fileResult.Rows.Count == 0)
-                {
-                    logger.LogError($"No file found for ObjectArtifactID={objectArtifactId} in table file{fileTableId}");
-                    return null;
-                }
-
                 return fileResult.Rows[0]["Location"].ToString();
             }
             catch (Exception ex)
             {
-                logger.LogError($"Error getting file path: {ex.Message}");
+                logger.LogError($"Error obtaining File location for inmport job: {ex.Message}");
                 return null;
             }
         }
