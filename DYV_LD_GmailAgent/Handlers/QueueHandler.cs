@@ -38,7 +38,7 @@ namespace DYV_Linked_Document_Management.Handlers
                 string sql = @"
                     SELECT TOP 1 
                         ImportQueueId, ImportIdentifier, ImportFilePath, LDFObjectArtifactId, 
-                        ImportWorkspaceArtifactId, ImportObjectTypArtifactId, FileType
+                        ImportWorkspaceArtifactId, ImportObjectTypArtifactId, FileType, CustodianId
                     FROM QE.LinkedDocumentImportQueue
                     WHERE SubmittedDateTime IS NOT NULL 
                     AND ImportStartedDateTime IS NULL
@@ -63,7 +63,8 @@ namespace DYV_Linked_Document_Management.Handlers
                     LDFObjectArtifactId = row["LDFObjectArtifactId"] != DBNull.Value ? Convert.ToInt32(row["LDFObjectArtifactId"]) : 0,
                     ImportWorkspaceArtifactId = row["ImportWorkspaceArtifactId"] != DBNull.Value ? Convert.ToInt32(row["ImportWorkspaceArtifactId"]) : 0,
                     ImportObjectTypArtifactId = row["ImportObjectTypArtifactId"] != DBNull.Value ? Convert.ToInt32(row["ImportObjectTypArtifactId"]) : 0,
-                    FileType = row["FileType"] != DBNull.Value ? row["FileType"].ToString() : string.Empty
+                    FileType = row["FileType"] != DBNull.Value ? row["FileType"].ToString() : string.Empty,
+                    CustodianId = row["CustodianId"] != DBNull.Value ? Convert.ToInt32(row["CustodianId"]) : 0
                 };
 
                 _logger.LogInformation($"Found import job {importQueueItem.ImportQueueId} for file type: {importQueueItem.FileType}");
@@ -166,6 +167,54 @@ namespace DYV_Linked_Document_Management.Handlers
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error marking import job {importQueueId} as completed");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Updates the Import_ImportId and Import_SourceId values for an import job
+        /// </summary>
+        /// <param name="importQueueId">The ID of the import job</param>
+        /// <param name="importId">The Import ID from Relativity</param>
+        /// <param name="sourceId">The Source ID from Relativity</param>
+        public void UpdateImportJobIds(int importQueueId, Guid importId, Guid sourceId)
+        {
+            try
+            {
+                if (importQueueId <= 0)
+                {
+                    throw new ArgumentException("Import queue ID must be greater than zero", nameof(importQueueId));
+                }
+
+                var parameters = new List<SqlParameter>
+        {
+            new SqlParameter("@ImportQueueId", importQueueId),
+            new SqlParameter("@ImportId", importId),
+            new SqlParameter("@SourceId", sourceId)
+        };
+
+                _logger.LogInformation($"Updating job {importQueueId} with Import ID {importId} and Source ID {sourceId}");
+
+                string sql = @"
+            UPDATE QE.LinkedDocumentImportQueue
+            SET Import_ImportId = @ImportId,
+                Import_SourceId = @SourceId
+            WHERE ImportQueueId = @ImportQueueId";
+
+                int rowsAffected = _eddsDbContext.ExecuteNonQuerySQLStatement(sql, parameters.ToArray());
+
+                if (rowsAffected <= 0)
+                {
+                    _logger.LogWarning($"Import job {importQueueId} could not be updated with Import IDs - it may not exist");
+                }
+                else
+                {
+                    _logger.LogInformation($"Updated import job {importQueueId} with Import IDs");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating import job {importQueueId} with Import IDs");
                 throw;
             }
         }

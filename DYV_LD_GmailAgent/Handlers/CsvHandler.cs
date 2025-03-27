@@ -253,14 +253,60 @@ namespace DYV_Linked_Document_Management.Handlers
             return dt;
         }
 
-        public string CreateModifiedGmailMetadataCsvFile(DataTable gmailMetadata, string originalFilePath, string fileLinkedDocumentValue, int custodianIdValue, ILDLogger ldLogger)
+        public string CreateModifiedGmailMetadataCsvFile(DataTable gmailMetadata, string originalFilePath,
+            string fileLinkedDocumentValue, int custodianIdValue, int workspaceArtifactId, ILDLogger ldLogger)
         {
             ldLogger.LogInformation("Creating modified Gmail Metadata CSV file with identifiers");
 
-            // Create a file in the same directory as the original but with a different name
-            string directory = Path.GetDirectoryName(originalFilePath);
+            // Extract the server and root path from the original file path
+            string originalPath = originalFilePath;
+            string rootPath = string.Empty;
+
+            // Extract the root path up to \files\ part
+            int filesIndex = originalPath.ToLower().IndexOf(@"\files\");
+            if (filesIndex > 0)
+            {
+                // Get everything before \files\
+                rootPath = originalPath.Substring(0, filesIndex);
+                ldLogger.LogInformation($"Extracted root path: {rootPath}");
+            }
+            else
+            {
+                // Fallback to the original directory if we can't determine the root
+                rootPath = Path.GetDirectoryName(originalPath);
+                ldLogger.LogWarning($"Could not find '\\files\\' in path: {originalPath}. Using fallback path: {rootPath}");
+            }
+
+            // Create the directory structure
+            string structuredDataPath = Path.Combine(rootPath, "StructuredData");
+            ldLogger.LogInformation($"StructuredData path: {structuredDataPath}");
+
+            // Verify that StructuredData exists (it should always exist)
+            if (!Directory.Exists(structuredDataPath))
+            {
+                ldLogger.LogError($"Required directory does not exist: {structuredDataPath}");
+                throw new DirectoryNotFoundException($"Required directory does not exist: {structuredDataPath}");
+            }
+
+            // The following directories may not exist - create them if needed
+            string linkedDocumentDataPath = Path.Combine(structuredDataPath, "LinkedDocumentData");
+            ldLogger.LogInformation($"LinkedDocumentData path: {linkedDocumentDataPath}");
+
+            string workspacePath = Path.Combine(linkedDocumentDataPath, workspaceArtifactId.ToString());
+            ldLogger.LogInformation($"Workspace path: {workspacePath}");
+
+            string gmailMetadataPath = Path.Combine(workspacePath, "GmailMetadata");
+            ldLogger.LogInformation($"GmailMetadata path: {gmailMetadataPath}");
+
+            // Create directories if they don't exist
+            EnsureDirectoryExists(linkedDocumentDataPath, ldLogger);
+            EnsureDirectoryExists(workspacePath, ldLogger);
+            EnsureDirectoryExists(gmailMetadataPath, ldLogger);
+
+            // Create the new file path
             string fileName = Path.GetFileNameWithoutExtension(originalFilePath);
-            string newFilePath = Path.Combine(directory, $"{fileName}_with_identifiers.csv");
+            string newFilePath = Path.Combine(gmailMetadataPath, $"{fileName}_with_identifiers.csv");
+            ldLogger.LogInformation($"New file path: {newFilePath}");
 
             try
             {
@@ -269,12 +315,12 @@ namespace DYV_Linked_Document_Management.Handlers
                 {
                     HasHeaderRecord = true,
                     Mode = CsvMode.RFC4180,
-                    ShouldQuote = args => args.Field.Contains(",") || args.Field.Contains("\"") || args.Field.Contains("\r") || args.Field.Contains("\n")
+                    ShouldQuote = args => args.Field.Contains(",") || args.Field.Contains("\"") ||
+                                          args.Field.Contains("\r") || args.Field.Contains("\n")
                 };
 
                 // Process all records and add required fields
                 var records = new List<GmailCsvMetadata>();
-
                 foreach (DataRow row in gmailMetadata.Rows)
                 {
                     var gmailRecord = new GmailCsvMetadata
@@ -302,12 +348,11 @@ namespace DYV_Linked_Document_Management.Handlers
                         FileLinkedDocument = fileLinkedDocumentValue,
                         CustodianId = custodianIdValue
                     };
-
                     records.Add(gmailRecord);
                 }
 
-                //Log the static value for FileLinkedDocument
                 ldLogger.LogInformation($"Added 'FileLinkedDocument' column with static value: {fileLinkedDocumentValue} for all {records.Count} records");
+                ldLogger.LogInformation($"Added 'CustodianId' column with static value: {custodianIdValue} for all {records.Count} records");
 
                 // Write all records to the new file
                 using (var writer = new StreamWriter(newFilePath))
@@ -332,6 +377,27 @@ namespace DYV_Linked_Document_Management.Handlers
             {
                 ldLogger.LogError(ex, $"Error creating modified Gmail Metadata CSV file: {ex.Message}");
                 throw;
+            }
+        }
+
+        private void EnsureDirectoryExists(string path, ILDLogger logger)
+        {
+            if (!Directory.Exists(path))
+            {
+                try
+                {
+                    Directory.CreateDirectory(path);
+                    logger.LogInformation($"Created directory: {path}");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, $"Error creating directory {path}: {ex.Message}");
+                    throw;
+                }
+            }
+            else
+            {
+                logger.LogInformation($"Directory already exists: {path}");
             }
         }
 

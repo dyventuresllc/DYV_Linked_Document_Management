@@ -38,7 +38,7 @@ namespace DYV_Linked_Document_Management.Agents
                 // Mark the job as in progress using the AgentID
                 _queueHandler.MarkImportJobAsInProgress(importJob.ImportQueueId, this.AgentID.ToString());
                 
-                _ldLogger.LogInformation($"Found import job: {importJob.ImportQueueId} with identifier: {importJob.ImportIdentifier}, for workspace: {importJob.ImportWorkspaceArtifactId}, file type: {importJob.FileType}");
+                _ldLogger.LogInformation($"Found import job: {importJob.ImportQueueId} with identifier: {importJob.ImportIdentifier}, for workspace: {importJob.ImportWorkspaceArtifactId}, file type: {importJob.FileType}, CustodianId: {importJob.CustodianId}");
                 _ldLogger.LogInformation($"Marked import job: {importJob.ImportQueueId} as in progress with agent ID: {this.AgentID}");
 
                 try

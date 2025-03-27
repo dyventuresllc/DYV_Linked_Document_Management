@@ -27,7 +27,7 @@ namespace DYV_Linked_Document_Management.Handlers
             _logger = logger;
         }
 
-        public async Task ImportGmailMetadataToRelativity(string csvFilePath, int workspaceId, int customObjectTypeId)
+        public async Task ImportGmailMetadataToRelativity(string csvFilePath, int workspaceId, int customObjectTypeId, int importQueueId)
         {
             try
             {
@@ -51,7 +51,8 @@ namespace DYV_Linked_Document_Management.Handlers
                     importId,
                     sourceId,
                     importSettings,
-                    dataSourceSettings);
+                    dataSourceSettings,
+                    importQueueId);
 
                 // Monitor the import progress
                 await MonitorImportProgress(httpClient, workspaceId, importId, sourceId);
@@ -141,7 +142,8 @@ namespace DYV_Linked_Document_Management.Handlers
             Guid importId,
             Guid sourceId,
             ImportRdoSettings importSettings,
-            DataSourceSettings dataSourceSettings)
+            DataSourceSettings dataSourceSettings,
+            int importQueueId)
         {
             // Create import job
             var createJobPayload = new
@@ -209,6 +211,26 @@ namespace DYV_Linked_Document_Management.Handlers
 
             // Log the job details for monitoring
             _logger.LogInformation($"Import job submitted with workspaceId: {workspaceId}, importId: {importId}, sourceId: {sourceId}");
+
+            // Update the queue item with the import and source IDs
+            if (importQueueId > 0)
+            {
+                try
+                {
+                    // Create an instance of QueueHandler to update the import job
+                    var eddsDbContext = _helper.GetDBContext(-1);
+                    var queueHandler = new QueueHandler(eddsDbContext, _logger);
+
+                    // Update the import job with the Relativity import and source IDs
+                    queueHandler.UpdateImportJobIds(importQueueId, importId, sourceId);
+                    _logger.LogInformation($"Updated import queue item {importQueueId} with Import ID and Source ID");
+                }
+                catch (Exception ex)
+                {
+                    // Log error but don't fail the import process
+                    _logger.LogError(ex, $"Error updating import queue item {importQueueId} with Import ID and Source ID");
+                }
+            }
         }
 
         private async Task MonitorImportProgress(HttpClient httpClient, int workspaceId, Guid importId, Guid sourceId)

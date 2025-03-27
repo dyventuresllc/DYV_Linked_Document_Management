@@ -76,7 +76,7 @@ namespace DYV_Linked_Document_Management.Managers
             try
             {
                 // Include more details in the log message
-                _logger.LogInformation($"Processing import job: {importJob.ImportIdentifier} (ID: {importJob.ImportQueueId}) for workspace: {importJob.ImportWorkspaceArtifactId}, file type: {importJob.FileType}");
+                _logger.LogInformation($"Processing import job: {importJob.ImportIdentifier} (ID: {importJob.ImportQueueId}) for workspace: {importJob.ImportWorkspaceArtifactId}, file type: {importJob.FileType}, custodianId: {importJob.CustodianId}");
 
                 // Process based on file type
                 switch (importJob.FileType)
@@ -215,7 +215,7 @@ namespace DYV_Linked_Document_Management.Managers
 
                 string fileLinkedDocumentValue = importJob.ImportIdentifier;
                 int custodianIdValue = importJob.CustodianId;
-                string modifiedCsvFilePath = _csvHandler.CreateModifiedGmailMetadataCsvFile(gmailData, importJob.ImportFilePath, fileLinkedDocumentValue, custodianIdValue, _logger);
+                string modifiedCsvFilePath = _csvHandler.CreateModifiedGmailMetadataCsvFile(gmailData, importJob.ImportFilePath, fileLinkedDocumentValue, custodianIdValue, importJob.ImportWorkspaceArtifactId, _logger);
 
                 // 5. Import the data into Relativity using the modified CSV file
                 _queueHandler.LogImportJobStatus(importJob.ImportQueueId, "Importing data into Relativity");
@@ -224,7 +224,8 @@ namespace DYV_Linked_Document_Management.Managers
                 await _importHandler.ImportGmailMetadataToRelativity(
                     modifiedCsvFilePath,
                     importJob.ImportWorkspaceArtifactId,
-                    importJob.ImportObjectTypArtifactId);
+                    importJob.ImportObjectTypArtifactId,
+                    importJob.ImportQueueId);
 
                 _queueHandler.LogImportJobStatus(importJob.ImportQueueId, "Import completed successfully");
                 _logger.LogInformation($"Email Metadata CSV processing completed successfully for job: {importJob.ImportIdentifier} (ID: {importJob.ImportQueueId})");
